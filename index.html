@@ -417,6 +417,24 @@
     color: var(--ink);
   }
 
+  .qa-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .qa-chip {
+    background: #fff;
+    border: 1px solid var(--bunker-tan);
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    color: var(--fairway-deep);
+    cursor: pointer;
+    font-family: 'Work Sans', sans-serif;
+    transition: background 0.15s ease;
+  }
+  .qa-chip:hover { background: var(--paper-dark); }
+
   @media (max-width: 480px) {
     .app-header .mark { font-size: 1.9rem; }
     table.scorecard { font-size: 0.7rem; }
@@ -443,6 +461,7 @@
     <div class="tab-notch left"></div>
     <button class="tab active" data-tab="scorecard">Scorecard</button>
     <button class="tab" data-tab="caddy">Caddy</button>
+    <button class="tab" data-tab="ask">Ask</button>
     <div class="tab-notch right"></div>
   </div>
 
@@ -527,6 +546,25 @@
       <h2 class="section-title" style="margin-top:26px;">Tips &amp; drills</h2>
       <p class="section-sub">Quick reference for the range or the first tee.</p>
       <div id="tipsList"></div>
+    </div>
+
+    <!-- ASK TAB -->
+    <div id="tab-ask" class="hidden">
+      <h2 class="section-title">Ask Loop</h2>
+      <p class="section-sub">Type a question about rules, etiquette, or strategy — answered instantly, no signal needed.</p>
+
+      <div class="round-meta">
+        <input type="text" id="askInput" placeholder="e.g. my ball went in the water, what do I do?">
+        <button class="primary" id="askBtn" style="flex: 0 0 90px;">Ask</button>
+      </div>
+
+      <div class="club-result hidden" id="askResult">
+        <div class="club-name" id="askQuestion" style="font-size:1.05rem;"></div>
+        <div class="club-note" id="askAnswer" style="text-align:left; margin-top:10px; line-height:1.5; color:#fff;"></div>
+      </div>
+
+      <h2 class="section-title" style="margin-top:22px;">Common questions</h2>
+      <div id="qaChips" class="qa-chips"></div>
     </div>
 
   </div>
@@ -720,6 +758,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     const target = tab.dataset.tab;
     document.getElementById('tab-scorecard').classList.toggle('hidden', target !== 'scorecard');
     document.getElementById('tab-caddy').classList.toggle('hidden', target !== 'caddy');
+    document.getElementById('tab-ask').classList.toggle('hidden', target !== 'ask');
   });
 });
 
@@ -864,6 +903,141 @@ tipsData.forEach(cat => {
     <ul>${cat.tips.map(t => `<li>${t}</li>`).join('')}</ul>
   `;
   tipsContainer.appendChild(details);
+});
+
+// ---------- Ask Loop: local Q&A ----------
+const qaData = [
+  {
+    q: "My ball went in the water, what do I do?",
+    keywords: ['water','hazard','penalty','pond','lake','creek'],
+    a: "You get one penalty stroke. Options: play a ball from where you last hit (stroke and distance), or if it's a red-staked penalty area, drop within two club-lengths of where the ball crossed into the hazard, no nearer the hole. If yellow-staked, you can also drop back on a line keeping the entry point between you and the hole."
+  },
+  {
+    q: "I can't find my ball, what happens?",
+    keywords: ['lost','ball','find','cant find'],
+    a: "If your ball is lost, it's stroke and distance: add one penalty stroke and replay from where you hit your last shot. You have 3 minutes to search before it's officially lost."
+  },
+  {
+    q: "My ball went out of bounds",
+    keywords: ['out','bounds','ob','boundary','white stakes'],
+    a: "Out of bounds is stroke and distance: add one penalty stroke and replay from where you hit your previous shot. Many casual rounds also use a 'local rule' allowing a drop near where the ball went out for two penalty strokes instead — check with your group."
+  },
+  {
+    q: "Can I move my ball if it's in an unplayable lie?",
+    keywords: ['unplayable','stuck','tree','bush'],
+    a: "Yes — declare it unplayable (only you decide this) and take one penalty stroke. You can: replay from your previous spot, drop within two club-lengths no nearer the hole, or drop anywhere on a line straight back from the hole through the ball's position."
+  },
+  {
+    q: "What if my ball is embedded in the fairway?",
+    keywords: ['embedded','plugged','mud','fairway'],
+    a: "If your ball is embedded in its own pitch-mark in the general area (not a bunker or penalty area), you get free relief — no penalty. Lift, clean if you like, and drop as close as possible to where it was, no nearer the hole."
+  },
+  {
+    q: "Can I fix my pitch mark on the green before putting?",
+    keywords: ['pitch','mark','ball mark','green','repair'],
+    a: "Yes, you can always repair a ball-mark (pitch mark) on the green before you putt, even if it's not your own. Spike marks, however, generally cannot be repaired before putting."
+  },
+  {
+    q: "Can I move the flagstick while putting?",
+    keywords: ['flagstick','flag','pin','putt'],
+    a: "You can putt with the flagstick left in or have it removed — your choice, no penalty either way. If it's left in and the ball hits it, that's also fine, no penalty."
+  },
+  {
+    q: "What's the etiquette on pace of play?",
+    keywords: ['pace','slow','etiquette','play through'],
+    a: "Keep up with the group ahead of you, not just behind the group behind. If you're holding people up and have an opening, wave faster groups through. Be ready to hit when it's your turn, and keep pre-shot routines efficient."
+  },
+  {
+    q: "Do I need to rake the bunker after my shot?",
+    keywords: ['rake','bunker','sand','etiquette'],
+    a: "Yes — always rake your footprints and the area you disturbed after playing from a bunker, and leave the rake outside the bunker (or where your course indicates) so it doesn't interfere with play."
+  },
+  {
+    q: "My ball moved slightly at address, what happens?",
+    keywords: ['moved','wobble','address','oscillate'],
+    a: "If your ball merely oscillates and returns to its original spot, there's no penalty and no replacement needed. If it actually moves to a new spot after you've addressed it, there's generally no penalty (as of the current rules) but you must replace it on its original spot."
+  },
+  {
+    q: "What club should I hit for a punch shot under trees?",
+    keywords: ['punch','trees','low shot','under branches'],
+    a: "Take one or two more clubs than you'd normally use, play the ball back in your stance, keep your hands ahead of the ball, and make an abbreviated follow-through to keep the trajectory down."
+  },
+  {
+    q: "How do I read a breaking putt?",
+    keywords: ['read','putt','break','slope','green'],
+    a: "Look at the green from behind the ball and from behind the hole. Check for the general slope of the whole green first (often toward water or lower ground), then focus on the last few feet near the hole, where breaks affect the ball most since it's rolling slowest there."
+  },
+  {
+    q: "What is a provisional ball?",
+    keywords: ['provisional','maybe lost','might be ob'],
+    a: "If you think your ball might be lost outside a penalty area or out of bounds, you can announce and play a provisional ball to save time. If the original is found in bounds, play it and pick up the provisional. If not, continue with the provisional under stroke and distance."
+  },
+  {
+    q: "What's a good strategy for a tucked pin?",
+    keywords: ['tucked','pin','tight pin','strategy'],
+    a: "Generally play to the center or fat part of the green rather than firing directly at a tucked pin. A longer, makeable putt is usually a better outcome than a bunker or rough shot from missing the tighter target."
+  },
+  {
+    q: "Can I get relief from a cart path?",
+    keywords: ['cart path','relief','free drop'],
+    a: "Yes — if your stance or swing is affected by a cart path (or other immovable obstruction), you get free relief. Find the nearest point of complete relief, no nearer the hole, and drop within one club-length of that point."
+  }
+];
+
+function searchQA(query) {
+  const q = query.toLowerCase();
+  let best = null;
+  let bestScore = 0;
+  qaData.forEach(item => {
+    let score = 0;
+    item.keywords.forEach(kw => {
+      if (q.includes(kw)) score += 1;
+    });
+    // Small bonus if the query shares words with the question itself
+    const qWords = item.q.toLowerCase().split(/\W+/).filter(w => w.length > 3);
+    qWords.forEach(w => { if (q.includes(w)) score += 0.5; });
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = item;
+    }
+  });
+  return bestScore > 0 ? best : null;
+}
+
+function showAskResult(item) {
+  const resultBox = document.getElementById('askResult');
+  if (!item) {
+    document.getElementById('askQuestion').textContent = "Hmm, not sure on that one.";
+    document.getElementById('askAnswer').textContent = "Try rephrasing, or tap one of the common questions below — the library covers rules situations, etiquette, and basic strategy calls.";
+    resultBox.classList.remove('hidden');
+    return;
+  }
+  document.getElementById('askQuestion').textContent = item.q;
+  document.getElementById('askAnswer').textContent = item.a;
+  resultBox.classList.remove('hidden');
+}
+
+document.getElementById('askBtn').addEventListener('click', () => {
+  const query = document.getElementById('askInput').value.trim();
+  if (!query) return;
+  showAskResult(searchQA(query));
+});
+
+document.getElementById('askInput').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') document.getElementById('askBtn').click();
+});
+
+const chipsContainer = document.getElementById('qaChips');
+qaData.forEach(item => {
+  const chip = document.createElement('button');
+  chip.className = 'qa-chip';
+  chip.textContent = item.q;
+  chip.addEventListener('click', () => {
+    document.getElementById('askInput').value = item.q;
+    showAskResult(item);
+  });
+  chipsContainer.appendChild(chip);
 });
 
 // ---------- Init ----------
