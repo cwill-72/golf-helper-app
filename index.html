@@ -36,7 +36,7 @@
   body {
     margin: 0;
     font-family: 'Work Sans', sans-serif;
-    background: linear-gradient(160deg, var(--fairway-deep) 0%, #163828 55%, #10281c 100%);
+    background: linear-gradient(135deg, var(--fairway-deep) 0%, #163828 55%, #10281c 100%);
     color: var(--ink);
     min-height: 100vh;
     min-height: 100dvh;
@@ -46,6 +46,47 @@
   .app {
     max-width: 640px;
     margin: 0 auto;
+  }
+
+  body[data-theme="light"] {
+    background: linear-gradient(135deg, #E8EDE2 0%, #DCE8DE 55%, #CFE0D2 100%);
+  }
+  html[data-theme-html="light"] { background: #CFE0D2; }
+  body[data-theme="light"] .app-header { color: var(--fairway-deep); }
+  body[data-theme="light"] .app-header p { color: var(--fairway-mid); }
+
+  .profile-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .profile-bar select {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--bunker-tan);
+    background: rgba(244,239,225,0.15);
+    color: var(--paper);
+    font-family: 'Work Sans', sans-serif;
+    font-size: 0.8rem;
+  }
+  body[data-theme="light"] .profile-bar select {
+    background: #fff;
+    color: var(--ink);
+  }
+  .profile-bar button {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--bunker-tan);
+    background: rgba(244,239,225,0.15);
+    color: var(--paper);
+    font-size: 0.8rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  body[data-theme="light"] .profile-bar button {
+    background: #fff;
+    color: var(--fairway-deep);
   }
 
   .app-header {
@@ -498,6 +539,17 @@
   }
   .qa-chip:hover { background: var(--paper-dark); }
 
+  table.scorecard select.club-select {
+    width: 100%;
+    max-width: 62px;
+    font-size: 0.68rem;
+    padding: 3px 1px;
+    border: 1px solid var(--bunker-tan);
+    border-radius: 5px;
+    background: #fff;
+    font-family: 'Work Sans', sans-serif;
+  }
+
   @media (max-width: 480px) {
     .app-header .mark { font-size: 1.9rem; }
     table.scorecard { font-size: 0.7rem; }
@@ -518,6 +570,12 @@
       Loop
     </div>
     <p>Your pocket caddy — runs on your device, no account, no fee</p>
+  </div>
+
+  <div class="profile-bar">
+    <select id="profileSelect"></select>
+    <button id="addProfileBtn" title="Add a new golfer profile">+ Golfer</button>
+    <button id="themeToggleBtn" title="Toggle light/dark">☀️</button>
   </div>
 
   <div class="tabs">
@@ -554,10 +612,12 @@
 
       <button class="primary" id="saveCourseBtn" style="background: var(--ink-soft); margin-bottom: 16px;">Save this course's pars for next time</button>
 
+      <textarea id="courseNotes" placeholder="Course notes (tricky pins, local quirks, club-house tips...)" style="width:100%; min-height:44px; padding:10px 12px; border:1px solid var(--bunker-tan); border-radius:8px; font-family:'Work Sans',sans-serif; font-size:0.82rem; margin-bottom:16px; resize:vertical; background:#fff; color:var(--ink);"></textarea>
+
       <table class="scorecard" id="scorecardTable">
         <thead>
           <tr>
-            <th>Hole</th><th>Par</th><th>Score</th><th>Putts</th><th>GIR</th>
+            <th>Hole</th><th>Par</th><th>Score</th><th>Putts</th><th>GIR</th><th>Club</th>
           </tr>
         </thead>
         <tbody id="scorecardBody"></tbody>
@@ -623,6 +683,24 @@
         <div class="club-note" id="clubNote"></div>
       </div>
 
+      <h2 class="section-title" style="margin-top:26px;">Course conditions</h2>
+      <p class="section-sub">Uses your location and an internet connection — the one Loop feature that isn't fully offline.</p>
+      <button class="primary" id="weatherBtn" style="margin-bottom: 14px;">Check current wind &amp; temp</button>
+      <div class="club-result hidden" id="weatherResult">
+        <div class="club-name" id="weatherTemp" style="font-size:1.6rem;">—</div>
+        <div class="club-note" id="weatherWind"></div>
+      </div>
+
+      <h2 class="section-title" style="margin-top:26px;">Practice log</h2>
+      <p class="section-sub">Track range sessions separately from real rounds.</p>
+      <div class="round-meta">
+        <input type="date" id="practiceDate">
+        <input type="text" id="practiceFocus" placeholder="Focus (e.g. bunker shots)">
+      </div>
+      <textarea id="practiceNotes" placeholder="Notes from the session..." style="width:100%; min-height:50px; padding:10px 12px; border:1px solid var(--bunker-tan); border-radius:8px; font-family:'Work Sans',sans-serif; font-size:0.85rem; margin-bottom:12px; resize:vertical; background:#fff; color:var(--ink);"></textarea>
+      <button class="primary" id="savePracticeBtn" style="margin-bottom:16px;">Log practice session</button>
+      <div id="practiceList"></div>
+
       <h2 class="section-title" style="margin-top:26px;">Tips &amp; drills</h2>
       <p class="section-sub">Quick reference for the range or the first tee.</p>
       <div id="tipsList"></div>
@@ -656,14 +734,80 @@
 </div>
 
 <script>
+// ---------- Profiles ----------
+function getProfiles() { return JSON.parse(localStorage.getItem('loop_profiles') || '[]'); }
+function setProfiles(p) { localStorage.setItem('loop_profiles', JSON.stringify(p)); }
+function getActiveProfileId() { return localStorage.getItem('loop_active_profile'); }
+function setActiveProfileId(id) { localStorage.setItem('loop_active_profile', id); }
+
+function ensureDefaultProfile() {
+  let profiles = getProfiles();
+  if (profiles.length === 0) {
+    const id = 'p_' + Date.now();
+    profiles = [{ id, name: 'Me' }];
+    setProfiles(profiles);
+    setActiveProfileId(id);
+  } else if (!getActiveProfileId()) {
+    setActiveProfileId(profiles[0].id);
+  }
+}
+ensureDefaultProfile();
+
+// Profile-scoped storage key — used for personal data (rounds, club distances)
+function k(base) { return 'loop_' + base + '__' + getActiveProfileId(); }
+
+function renderProfileSelect() {
+  const select = document.getElementById('profileSelect');
+  const profiles = getProfiles();
+  const active = getActiveProfileId();
+  select.innerHTML = '';
+  profiles.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    if (p.id === active) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
+document.getElementById('profileSelect').addEventListener('change', (e) => {
+  setActiveProfileId(e.target.value);
+  location.reload();
+});
+
+document.getElementById('addProfileBtn').addEventListener('click', () => {
+  const name = prompt('Name for the new golfer profile:');
+  if (!name || !name.trim()) return;
+  const profiles = getProfiles();
+  const id = 'p_' + Date.now();
+  profiles.push({ id, name: name.trim() });
+  setProfiles(profiles);
+  setActiveProfileId(id);
+  location.reload();
+});
+
+// ---------- Theme ----------
+function applyTheme(theme) {
+  document.body.setAttribute('data-theme', theme);
+  document.documentElement.setAttribute('data-theme-html', theme);
+  document.getElementById('themeToggleBtn').textContent = theme === 'light' ? '🌙' : '☀️';
+}
+const savedTheme = localStorage.getItem('loop_theme') || 'dark';
+applyTheme(savedTheme);
+document.getElementById('themeToggleBtn').addEventListener('click', () => {
+  const current = document.body.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  localStorage.setItem('loop_theme', current);
+  applyTheme(current);
+});
+
 // ---------- Scorecard logic ----------
 const scorecardBody = document.getElementById('scorecardBody');
 let roundLength = '18';
 
 function createHoles(length) {
-  if (length === 'front9') return Array.from({length: 9}, (_, i) => ({ hole: i+1, par: 4, score: '', putts: '', gir: false }));
-  if (length === 'back9') return Array.from({length: 9}, (_, i) => ({ hole: i+10, par: 4, score: '', putts: '', gir: false }));
-  return Array.from({length: 18}, (_, i) => ({ hole: i+1, par: 4, score: '', putts: '', gir: false }));
+  if (length === 'front9') return Array.from({length: 9}, (_, i) => ({ hole: i+1, par: 4, score: '', putts: '', gir: false, club: '' }));
+  if (length === 'back9') return Array.from({length: 9}, (_, i) => ({ hole: i+10, par: 4, score: '', putts: '', gir: false, club: '' }));
+  return Array.from({length: 18}, (_, i) => ({ hole: i+1, par: 4, score: '', putts: '', gir: false, club: '' }));
 }
 
 let holes = createHoles(roundLength);
@@ -711,6 +855,25 @@ const builtInCourses = [
   }
 ];
 
+function getCourseNotesMap() { return JSON.parse(localStorage.getItem('loop_course_notes') || '{}'); }
+function setCourseNotesMap(m) { localStorage.setItem('loop_course_notes', JSON.stringify(m)); }
+
+function loadCourseNotesForCurrentName() {
+  const name = document.getElementById('courseName').value.trim().toLowerCase();
+  const map = getCourseNotesMap();
+  document.getElementById('courseNotes').value = (name && map[name]) ? map[name] : '';
+}
+
+document.getElementById('courseName').addEventListener('blur', loadCourseNotesForCurrentName);
+
+document.getElementById('courseNotes').addEventListener('blur', () => {
+  const name = document.getElementById('courseName').value.trim().toLowerCase();
+  if (!name) return;
+  const map = getCourseNotesMap();
+  map[name] = document.getElementById('courseNotes').value;
+  setCourseNotesMap(map);
+});
+
 function getSavedCourses() {
   return JSON.parse(localStorage.getItem('loop_courses') || '[]');
 }
@@ -757,6 +920,7 @@ document.getElementById('courseSelect').addEventListener('change', (e) => {
   parsToApply.forEach((par, i) => {
     if (holes[i]) holes[i].par = par;
   });
+  loadCourseNotesForCurrentName();
   renderScorecard();
 });
 
@@ -786,6 +950,15 @@ document.getElementById('saveCourseBtn').addEventListener('click', () => {
   setTimeout(() => { btn.textContent = original; }, 1200);
 });
 
+function clubOptionsHtml(selected) {
+  let opts = '<option value="">-</option>';
+  const list = (typeof clubDistances !== 'undefined' && clubDistances.length) ? clubDistances : [];
+  list.forEach(c => {
+    opts += `<option value="${c.club}" ${selected === c.club ? 'selected' : ''}>${c.club}</option>`;
+  });
+  return opts;
+}
+
 function renderScorecard() {
   scorecardBody.innerHTML = '';
   const is18 = holes.length === 18;
@@ -798,6 +971,7 @@ function renderScorecard() {
       <td><input type="number" min="1" max="15" value="${h.score}" data-idx="${idx}" data-field="score" placeholder="-"></td>
       <td><input type="number" min="0" max="6" value="${h.putts}" data-idx="${idx}" data-field="putts" placeholder="-" style="width:28px;"></td>
       <td><input type="checkbox" data-idx="${idx}" data-field="gir" ${h.gir ? 'checked' : ''}></td>
+      <td><select data-idx="${idx}" data-field="club" class="club-select">${clubOptionsHtml(h.club)}</select></td>
     `;
     scorecardBody.appendChild(tr);
 
@@ -823,7 +997,7 @@ function subtotalRow(label, subset) {
   const scoreSum = subset.reduce((a,h)=>a+Number(h.score||0),0);
   const puttsSum = subset.reduce((a,h)=>a+Number(h.putts||0),0);
   const girCount = subset.filter(h => h.gir).length;
-  tr.innerHTML = `<td>${label}</td><td>${parSum}</td><td>${scoreSum || '-'}</td><td>${puttsSum || '-'}</td><td>${girCount}/${subset.length}</td>`;
+  tr.innerHTML = `<td>${label}</td><td>${parSum}</td><td>${scoreSum || '-'}</td><td>${puttsSum || '-'}</td><td>${girCount}/${subset.length}</td><td></td>`;
   return tr;
 }
 
@@ -835,6 +1009,12 @@ function attachInputListeners() {
       const field = e.target.dataset.field;
       holes[idx][field] = field === 'gir' ? e.target.checked : e.target.value;
       updateTotals();
+    });
+  });
+  scorecardBody.querySelectorAll('select.club-select').forEach(sel => {
+    sel.addEventListener('change', e => {
+      const idx = e.target.dataset.idx;
+      holes[idx].club = e.target.value;
     });
   });
 }
@@ -862,14 +1042,14 @@ document.getElementById('saveRoundBtn').addEventListener('click', () => {
     return;
   }
 
-  const rounds = JSON.parse(localStorage.getItem('loop_rounds') || '[]');
+  const rounds = JSON.parse(localStorage.getItem(k('rounds')) || '[]');
   rounds.unshift({
     course, date, notes, totalPar, totalScore,
     holesPlayed: holes.length,
     roundLength: roundLength,
     holes: JSON.parse(JSON.stringify(holes))
   });
-  localStorage.setItem('loop_rounds', JSON.stringify(rounds));
+  localStorage.setItem(k('rounds'), JSON.stringify(rounds));
 
   // reset for next round
   holes = createHoles(roundLength);
@@ -922,8 +1102,62 @@ function computeCourseBests(rounds) {
   return Object.values(map).sort((a,b) => a.diff - b.diff);
 }
 
+function computeAchievements(rounds) {
+  const badges = [];
+  if (rounds.length >= 1) badges.push({ label: 'First round logged', icon: '🏁' });
+  const milestones = [5, 10, 25, 50, 100];
+  milestones.forEach(m => { if (rounds.length >= m) badges.push({ label: `${m} rounds played`, icon: '📈' }); });
+
+  // First birdie ever (scan chronologically — rounds stored newest-first, so reverse)
+  const chron = [...rounds].reverse();
+  let firstBirdieFound = false;
+  chron.forEach(r => {
+    if (firstBirdieFound) return;
+    (r.holes || []).forEach(h => {
+      if (firstBirdieFound || h.score === '' || h.score == null) return;
+      if (Number(h.score) - Number(h.par) === -1) firstBirdieFound = true;
+    });
+  });
+  if (firstBirdieFound) badges.push({ label: 'First birdie', icon: '🐦' });
+
+  let firstEagleFound = false;
+  chron.forEach(r => {
+    if (firstEagleFound) return;
+    (r.holes || []).forEach(h => {
+      if (firstEagleFound || h.score === '' || h.score == null) return;
+      if (Number(h.score) - Number(h.par) <= -2) firstEagleFound = true;
+    });
+  });
+  if (firstEagleFound) badges.push({ label: 'First eagle or better', icon: '🦅' });
+
+  const under90 = rounds.some(r => (r.holesPlayed || 18) === 18 && r.totalScore < 90);
+  if (under90) badges.push({ label: 'Broke 90', icon: '🎯' });
+  const under80 = rounds.some(r => (r.holesPlayed || 18) === 18 && r.totalScore < 80);
+  if (under80) badges.push({ label: 'Broke 80', icon: '🏆' });
+
+  return badges;
+}
+
+function computeClubUsage(rounds) {
+  const map = {};
+  rounds.forEach(r => {
+    (r.holes || []).forEach(h => {
+      if (!h.club) return;
+      if (!map[h.club]) map[h.club] = { count: 0, diffSum: 0, diffCount: 0 };
+      map[h.club].count++;
+      if (h.score !== '' && h.score != null) {
+        map[h.club].diffSum += Number(h.score) - Number(h.par);
+        map[h.club].diffCount++;
+      }
+    });
+  });
+  return Object.entries(map)
+    .map(([club, d]) => ({ club, count: d.count, avgDiff: d.diffCount ? d.diffSum / d.diffCount : null }))
+    .sort((a,b) => b.count - a.count);
+}
+
 function renderStats() {
-  const rounds = JSON.parse(localStorage.getItem('loop_rounds') || '[]');
+  const rounds = JSON.parse(localStorage.getItem(k('rounds')) || '[]');
   const panel = document.getElementById('statsPanel');
 
   if (rounds.length === 0) {
@@ -1030,6 +1264,31 @@ function renderStats() {
     });
   }
 
+  const badges = computeAchievements(rounds);
+  if (badges.length > 0) {
+    html += `<h2 class="section-title" style="margin-top:20px; font-size:1.05rem;">Achievements</h2>`;
+    html += `<div class="qa-chips" style="margin-bottom:16px;">`;
+    badges.forEach(b => {
+      html += `<span class="qa-chip" style="cursor:default;">${b.icon} ${b.label}</span>`;
+    });
+    html += `</div>`;
+  }
+
+  const clubUsage = computeClubUsage(rounds);
+  if (clubUsage.length > 0) {
+    html += `<h2 class="section-title" style="margin-top:6px; font-size:1.05rem;">Club usage</h2>`;
+    html += `<p class="section-sub" style="margin-bottom:10px;">How often each club was logged, and your average score-to-par on holes you used it.</p>`;
+    clubUsage.forEach(c => {
+      const avgLabel = c.avgDiff === null ? '—' : (c.avgDiff === 0 ? 'E' : (c.avgDiff > 0 ? '+' + c.avgDiff.toFixed(1) : c.avgDiff.toFixed(1)));
+      html += `
+        <div class="round-card">
+          <div class="rc-course">${c.club}</div>
+          <span class="rc-score">${c.count}× · avg ${avgLabel}</span>
+        </div>
+      `;
+    });
+  }
+
   panel.innerHTML = html;
 }
 
@@ -1040,7 +1299,7 @@ function escapeHtml(str) {
 }
 
 function renderPastRounds() {
-  const rounds = JSON.parse(localStorage.getItem('loop_rounds') || '[]');
+  const rounds = JSON.parse(localStorage.getItem(k('rounds')) || '[]');
   const container = document.getElementById('pastRoundsList');
   if (rounds.length === 0) {
     container.innerHTML = '<p class="empty-note">No rounds saved yet — finish one above and save it.</p>';
@@ -1071,9 +1330,9 @@ function renderPastRounds() {
   container.querySelectorAll('.del').forEach(btn => {
     btn.addEventListener('click', e => {
       const idx = Number(e.target.dataset.idx);
-      const rounds = JSON.parse(localStorage.getItem('loop_rounds') || '[]');
+      const rounds = JSON.parse(localStorage.getItem(k('rounds')) || '[]');
       rounds.splice(idx, 1);
-      localStorage.setItem('loop_rounds', JSON.stringify(rounds));
+      localStorage.setItem(k('rounds'), JSON.stringify(rounds));
       renderPastRounds();
       renderStats();
     });
@@ -1081,7 +1340,7 @@ function renderPastRounds() {
 }
 
 document.getElementById('exportCsvBtn').addEventListener('click', () => {
-  const rounds = JSON.parse(localStorage.getItem('loop_rounds') || '[]');
+  const rounds = JSON.parse(localStorage.getItem(k('rounds')) || '[]');
   if (rounds.length === 0) {
     alert('No rounds saved yet to export.');
     return;
@@ -1136,7 +1395,7 @@ const defaultClubDistances = [
 let clubDistances = JSON.parse(JSON.stringify(defaultClubDistances));
 
 function loadClubDistances() {
-  const saved = localStorage.getItem('loop_clubs');
+  const saved = localStorage.getItem(k('clubs'));
   if (saved) {
     try {
       clubDistances = JSON.parse(saved);
@@ -1168,7 +1427,7 @@ function renderClubDistancesForm() {
 }
 
 document.getElementById('saveClubsBtn').addEventListener('click', () => {
-  localStorage.setItem('loop_clubs', JSON.stringify(clubDistances));
+  localStorage.setItem(k('clubs'), JSON.stringify(clubDistances));
   const btn = document.getElementById('saveClubsBtn');
   const original = btn.textContent;
   btn.textContent = 'Saved ✓';
@@ -1178,7 +1437,7 @@ document.getElementById('saveClubsBtn').addEventListener('click', () => {
 document.getElementById('resetClubsBtn').addEventListener('click', () => {
   if (!confirm('Reset all club distances back to the default averages?')) return;
   clubDistances = JSON.parse(JSON.stringify(defaultClubDistances));
-  localStorage.removeItem('loop_clubs');
+  localStorage.removeItem(k('clubs'));
   renderClubDistancesForm();
 });
 
@@ -1211,6 +1470,92 @@ document.getElementById('recommendBtn').addEventListener('click', () => {
   document.getElementById('clubName').textContent = best.club;
   document.getElementById('clubNote').textContent = `Playing ~${Math.round(adjusted)} yds. ${note}`;
   document.getElementById('clubResult').classList.remove('hidden');
+});
+
+// ---------- Caddy: course conditions (weather) ----------
+document.getElementById('weatherBtn').addEventListener('click', () => {
+  if (!navigator.geolocation) {
+    alert('Location isn\'t available in this browser.');
+    return;
+  }
+  const btn = document.getElementById('weatherBtn');
+  const original = btn.textContent;
+  btn.textContent = 'Checking...';
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    try {
+      const { latitude, longitude } = pos.coords;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,wind_speed_10m,wind_direction_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const temp = Math.round(data.current.temperature_2m);
+      const windSpeed = Math.round(data.current.wind_speed_10m);
+      const windDir = data.current.wind_direction_10m;
+      const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+      const dirLabel = dirs[Math.round(windDir / 22.5) % 16];
+      document.getElementById('weatherTemp').textContent = `${temp}°F`;
+      document.getElementById('weatherWind').textContent = `Wind ${windSpeed} mph from the ${dirLabel}`;
+      document.getElementById('weatherResult').classList.remove('hidden');
+    } catch (err) {
+      alert('Could not fetch weather — check your connection and try again.');
+    } finally {
+      btn.textContent = original;
+    }
+  }, () => {
+    alert('Location permission is needed to check local conditions.');
+    btn.textContent = original;
+  });
+});
+
+// ---------- Caddy: practice log (profile-scoped) ----------
+function getPracticeLog() { return JSON.parse(localStorage.getItem(k('practice')) || '[]'); }
+function setPracticeLog(p) { localStorage.setItem(k('practice'), JSON.stringify(p)); }
+
+function renderPracticeList() {
+  const log = getPracticeLog();
+  const container = document.getElementById('practiceList');
+  if (log.length === 0) {
+    container.innerHTML = '<p class="empty-note">No practice sessions logged yet.</p>';
+    return;
+  }
+  container.innerHTML = '';
+  log.forEach((entry, idx) => {
+    const div = document.createElement('div');
+    div.className = 'round-card';
+    div.innerHTML = `
+      <div>
+        <div class="rc-course">${escapeHtml(entry.focus) || 'Practice session'}</div>
+        <div class="rc-date">${entry.date}${entry.notes ? ' — ' + escapeHtml(entry.notes) : ''}</div>
+      </div>
+      <button class="del" data-idx="${idx}">remove</button>
+    `;
+    container.appendChild(div);
+  });
+  container.querySelectorAll('.del').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const idx = Number(e.target.dataset.idx);
+      const log = getPracticeLog();
+      log.splice(idx, 1);
+      setPracticeLog(log);
+      renderPracticeList();
+    });
+  });
+}
+
+document.getElementById('savePracticeBtn').addEventListener('click', () => {
+  const date = document.getElementById('practiceDate').value || new Date().toISOString().split('T')[0];
+  const focus = document.getElementById('practiceFocus').value.trim();
+  const notes = document.getElementById('practiceNotes').value.trim();
+  if (!focus && !notes) {
+    alert('Add a focus area or a note before logging the session.');
+    return;
+  }
+  const log = getPracticeLog();
+  log.unshift({ date, focus, notes });
+  setPracticeLog(log);
+  document.getElementById('practiceDate').value = '';
+  document.getElementById('practiceFocus').value = '';
+  document.getElementById('practiceNotes').value = '';
+  renderPracticeList();
 });
 
 // ---------- Caddy: tips library ----------
@@ -1531,10 +1876,12 @@ qaData.forEach(item => {
 });
 
 // ---------- Init ----------
+renderProfileSelect();
 renderCourseSelect();
 renderScorecard();
 renderPastRounds();
 renderStats();
+renderPracticeList();
 </script>
 </body>
 </html>
