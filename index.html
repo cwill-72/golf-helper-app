@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loop — Your Pocket Caddy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fairway-deep: #1B4332;
+    --fairway-mid: #2D6A4F;
+    --fairway-light: #40916C;
+    --paper: #F4EFE1;
+    --paper-dark: #E8DFC8;
+    --bunker-tan: #C9A876;
+    --flag-red: #A63446;
+    --ink: #23281F;
+    --ink-soft: #5B6155;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'Work Sans', sans-serif;
+    background: linear-gradient(160deg, var(--fairway-deep) 0%, #163828 55%, #10281c 100%);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 32px 16px 60px;
+  }
+
+  .app {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .app-header {
+    text-align: center;
+    margin-bottom: 28px;
+    color: var(--paper);
+  }
+
+  .app-header .mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Fraunces', serif;
+    font-size: 2.4rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .app-header .mark svg { flex-shrink: 0; }
+
+  .app-header p {
+    margin: 6px 0 0;
+    font-size: 0.85rem;
+    color: var(--bunker-tan);
+    letter-spacing: 0.02em;
+  }
+
+  /* Perforated tab switcher — like tearing a ticket stub */
+  .tabs {
+    display: flex;
+    background: var(--paper-dark);
+    border-radius: 14px 14px 0 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tabs::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 0;
+    border-bottom: 2px dashed rgba(35,40,31,0.25);
+  }
+
+  .tab {
+    flex: 1;
+    padding: 16px 12px;
+    text-align: center;
+    font-family: 'Work Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    color: var(--ink-soft);
+    background: none;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s ease, background 0.2s ease;
+  }
+
+  .tab.active {
+    color: var(--fairway-deep);
+    background: var(--paper);
+  }
+
+  .tab.active::before {
+    content: '';
+    position: absolute;
+    top: -1px; left: -1px; right: -1px;
+    height: 3px;
+    background: var(--flag-red);
+  }
+
+  .tab-notch {
+    position: absolute;
+    width: 16px; height: 16px;
+    background: var(--fairway-deep);
+    border-radius: 50%;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+  }
+  .tab-notch.left { left: -8px; }
+  .tab-notch.right { right: -8px; }
+
+  .panel {
+    background: var(--paper);
+    border-radius: 0 0 14px 14px;
+    padding: 24px 22px 30px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  }
+
+  .hidden { display: none !important; }
+
+  h2.section-title {
+    font-family: 'Fraunces', serif;
+    font-size: 1.3rem;
+    margin: 0 0 4px;
+    color: var(--fairway-deep);
+  }
+  .section-sub {
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    margin: 0 0 18px;
+  }
+
+  .round-meta {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .round-meta input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid var(--bunker-tan);
+    border-radius: 8px;
+    background: #fff;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 0.9rem;
+    color: var(--ink);
+  }
+
+  table.scorecard {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    margin-bottom: 14px;
+  }
+  table.scorecard th, table.scorecard td {
+    text-align: center;
+    padding: 6px 2px;
+    border-bottom: 1px solid var(--paper-dark);
+  }
+  table.scorecard th {
+    color: var(--ink-soft);
+    font-weight: 500;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  table.scorecard td.hole-label {
+    font-weight: 700;
+    color: var(--fairway-deep);
+  }
+  table.scorecard tr.back-nine td:first-child,
+  table.scorecard tr.back-nine th {
+    background: rgba(64,145,108,0.06);
+  }
+  table.scorecard input {
+    width: 34px;
+    text-align: center;
+    border: 1px solid var(--bunker-tan);
+    border-radius: 6px;
+    padding: 4px 2px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    background: #fff;
+  }
+  .subtotal-row td {
+    font-weight: 700;
+    color: var(--fairway-deep);
+    border-top: 2px solid var(--bunker-tan);
+    background: rgba(201,168,118,0.12);
+  }
+
+  .totals-strip {
+    display: flex;
+    justify-content: space-between;
+    background: var(--fairway-deep);
+    color: var(--paper);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .totals-strip .stat { text-align: center; }
+  .totals-strip .stat .num { font-size: 1.3rem; font-weight: 700; display: block; }
+  .totals-strip .stat .lbl { font-size: 0.65rem; color: var(--bunker-tan); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  button.primary {
+    width: 100%;
+    padding: 13px;
+    background: var(--flag-red);
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    font-family: 'Work Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+  button.primary:hover { background: #8c2b39; }
+  button.primary:active { transform: scale(0.99); }
+
+  .past-rounds {
+    margin-top: 24px;
+    border-top: 1px dashed var(--bunker-tan);
+    padding-top: 16px;
+  }
+  .round-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid var(--paper-dark);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+  }
+  .round-card .rc-course { font-weight: 600; color: var(--fairway-deep); }
+  .round-card .rc-date { color: var(--ink-soft); font-size: 0.75rem; }
+  .round-card .rc-score { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+  .round-card .rc-score.under { color: var(--fairway-mid); }
+  .round-card .rc-score.over { color: var(--flag-red); }
+  .round-card button.del {
+    background: none; border: none; color: var(--ink-soft); cursor: pointer;
+    font-size: 0.75rem; text-decoration: underline; padding: 0 0 0 10px;
+  }
+  .empty-note { color: var(--ink-soft); font-size: 0.85rem; font-style: italic; }
+
+  /* Caddy tab */
+  .club-form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .club-form > div { flex: 1; min-width: 120px; }
+  .club-form label {
+    display: block;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  .club-form input, .club-form select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--bunker-tan);
+    border-radius: 8px;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 0.9rem;
+    background: #fff;
+  }
+
+  .club-result {
+    background: var(--fairway-deep);
+    color: var(--paper);
+    border-radius: 10px;
+    padding: 18px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .club-result .club-name {
+    font-family: 'Fraunces', serif;
+    font-size: 1.7rem;
+    font-weight: 600;
+    color: #fff;
+  }
+  .club-result .club-note {
+    font-size: 0.8rem;
+    color: var(--bunker-tan);
+    margin-top: 4px;
+  }
+
+  .tips-cat {
+    margin-bottom: 10px;
+    border: 1px solid var(--paper-dark);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .tips-cat summary {
+    padding: 12px 14px;
+    font-weight: 600;
+    color: var(--fairway-deep);
+    cursor: pointer;
+    background: #fff;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .tips-cat summary::-webkit-details-marker { display: none; }
+  .tips-cat summary::after { content: '+'; color: var(--flag-red); font-size: 1.1rem; }
+  .tips-cat[open] summary::after { content: '–'; }
+  .tips-cat ul {
+    margin: 0;
+    padding: 12px 20px 14px 32px;
+    background: var(--paper);
+    font-size: 0.87rem;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+
+  @media (max-width: 480px) {
+    .app-header .mark { font-size: 1.9rem; }
+    table.scorecard { font-size: 0.7rem; }
+    table.scorecard input { width: 26px; padding: 3px 1px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="app-header">
+    <div class="mark">
+      <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+        <circle cx="17" cy="17" r="15.5" stroke="#F4EFE1" stroke-width="1.5" stroke-dasharray="2 3"/>
+        <path d="M17 6L17 22" stroke="#A63446" stroke-width="2" stroke-linecap="round"/>
+        <path d="M17 6L26 9.5L17 12.5Z" fill="#F4EFE1"/>
+      </svg>
+      Loop
+    </div>
+    <p>Your pocket caddy — runs on your device, no account, no fee</p>
+  </div>
+
+  <div class="tabs">
+    <div class="tab-notch left"></div>
+    <button class="tab active" data-tab="scorecard">Scorecard</button>
+    <button class="tab" data-tab="caddy">Caddy</button>
+    <div class="tab-notch right"></div>
+  </div>
+
+  <div class="panel">
+
+    <!-- SCORECARD TAB -->
+    <div id="tab-scorecard">
+      <h2 class="section-title">Today's round</h2>
+      <p class="section-sub">Enter your score hole by hole — Loop keeps the running total.</p>
+
+      <div class="round-meta">
+        <input type="text" id="courseName" placeholder="Course name">
+        <input type="date" id="roundDate">
+      </div>
+
+      <table class="scorecard" id="scorecardTable">
+        <thead>
+          <tr>
+            <th>Hole</th><th>Par</th><th>Score</th>
+          </tr>
+        </thead>
+        <tbody id="scorecardBody"></tbody>
+      </table>
+
+      <div class="totals-strip">
+        <div class="stat"><span class="num" id="totalPar">0</span><span class="lbl">Par</span></div>
+        <div class="stat"><span class="num" id="totalScore">0</span><span class="lbl">Score</span></div>
+        <div class="stat"><span class="num" id="totalDiff">E</span><span class="lbl">To Par</span></div>
+      </div>
+
+      <button class="primary" id="saveRoundBtn">Save round</button>
+
+      <div class="past-rounds">
+        <h2 class="section-title">Past rounds</h2>
+        <div id="pastRoundsList"><p class="empty-note">No rounds saved yet — finish one above and save it.</p></div>
+      </div>
+    </div>
+
+    <!-- CADDY TAB -->
+    <div id="tab-caddy" class="hidden">
+      <h2 class="section-title">Club recommender</h2>
+      <p class="section-sub">Ballpark suggestion based on typical distances — dial it in over time.</p>
+
+      <div class="club-form">
+        <div>
+          <label>Distance to pin (yds)</label>
+          <input type="number" id="yardageInput" placeholder="150">
+        </div>
+        <div>
+          <label>Lie / conditions</label>
+          <select id="conditionInput">
+            <option value="flat">Flat, no wind</option>
+            <option value="headwind">Into the wind</option>
+            <option value="tailwind">Downwind</option>
+            <option value="uphill">Uphill lie</option>
+            <option value="downhill">Downhill lie</option>
+          </select>
+        </div>
+      </div>
+      <button class="primary" id="recommendBtn">Suggest a club</button>
+
+      <div class="club-result hidden" id="clubResult">
+        <div class="club-name" id="clubName">—</div>
+        <div class="club-note" id="clubNote"></div>
+      </div>
+
+      <h2 class="section-title" style="margin-top:26px;">Tips &amp; drills</h2>
+      <p class="section-sub">Quick reference for the range or the first tee.</p>
+      <div id="tipsList"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ---------- Scorecard logic ----------
+const scorecardBody = document.getElementById('scorecardBody');
+let holes = Array.from({length: 18}, (_, i) => ({ hole: i+1, par: 4, score: '' }));
+
+function renderScorecard() {
+  scorecardBody.innerHTML = '';
+  holes.forEach((h, idx) => {
+    const tr = document.createElement('tr');
+    if (h.hole > 9) tr.classList.add('back-nine');
+    tr.innerHTML = `
+      <td class="hole-label">${h.hole}</td>
+      <td><input type="number" min="3" max="6" value="${h.par}" data-idx="${idx}" data-field="par"></td>
+      <td><input type="number" min="1" max="15" value="${h.score}" data-idx="${idx}" data-field="score" placeholder="-"></td>
+    `;
+    scorecardBody.appendChild(tr);
+
+    if (h.hole === 9) {
+      const sub = subtotalRow('OUT', holes.slice(0,9));
+      scorecardBody.appendChild(sub);
+    }
+    if (h.hole === 18) {
+      const sub = subtotalRow('IN', holes.slice(9,18));
+      scorecardBody.appendChild(sub);
+    }
+  });
+  attachInputListeners();
+  updateTotals();
+}
+
+function subtotalRow(label, subset) {
+  const tr = document.createElement('tr');
+  tr.classList.add('subtotal-row');
+  const parSum = subset.reduce((a,h)=>a+Number(h.par||0),0);
+  const scoreSum = subset.reduce((a,h)=>a+Number(h.score||0),0);
+  tr.innerHTML = `<td>${label}</td><td>${parSum}</td><td>${scoreSum || '-'}</td>`;
+  return tr;
+}
+
+function attachInputListeners() {
+  scorecardBody.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const idx = e.target.dataset.idx;
+      const field = e.target.dataset.field;
+      holes[idx][field] = e.target.value;
+      updateTotals();
+    });
+  });
+}
+
+function updateTotals() {
+  const totalPar = holes.reduce((a,h)=>a+Number(h.par||0),0);
+  const scored = holes.filter(h => h.score !== '');
+  const totalScore = scored.reduce((a,h)=>a+Number(h.score||0),0);
+  document.getElementById('totalPar').textContent = totalPar;
+  document.getElementById('totalScore').textContent = scored.length ? totalScore : '0';
+  const diff = scored.length ? totalScore - holes.slice(0, holes.indexOf(scored[scored.length-1])+1).reduce((a,h)=>a+Number(h.par||0),0) : 0;
+  const diffLabel = scored.length === 0 ? 'E' : (diff === 0 ? 'E' : (diff > 0 ? '+' + diff : diff));
+  document.getElementById('totalDiff').textContent = diffLabel;
+}
+
+document.getElementById('saveRoundBtn').addEventListener('click', () => {
+  const course = document.getElementById('courseName').value.trim() || 'Unnamed course';
+  const date = document.getElementById('roundDate').value || new Date().toISOString().split('T')[0];
+  const totalPar = holes.reduce((a,h)=>a+Number(h.par||0),0);
+  const totalScore = holes.reduce((a,h)=>a+Number(h.score||0),0);
+
+  if (totalScore === 0) {
+    alert('Enter at least a few scores before saving.');
+    return;
+  }
+
+  const rounds = JSON.parse(localStorage.getItem('loop_rounds') || '[]');
+  rounds.unshift({ course, date, totalPar, totalScore, holes: JSON.parse(JSON.stringify(holes)) });
+  localStorage.setItem('loop_rounds', JSON.stringify(rounds));
+
+  // reset for next round
+  holes = Array.from({length: 18}, (_, i) => ({ hole: i+1, par: 4, score: '' }));
+  document.getElementById('courseName').value = '';
+  document.getElementById('roundDate').value = '';
+  renderScorecard();
+  renderPastRounds();
+});
+
+function renderPastRounds() {
+  const rounds = JSON.parse(localStorage.getItem('loop_rounds') || '[]');
+  const container = document.getElementById('pastRoundsList');
+  if (rounds.length === 0) {
+    container.innerHTML = '<p class="empty-note">No rounds saved yet — finish one above and save it.</p>';
+    return;
+  }
+  container.innerHTML = '';
+  rounds.forEach((r, idx) => {
+    const diff = r.totalScore - r.totalPar;
+    const diffClass = diff > 0 ? 'over' : (diff < 0 ? 'under' : '');
+    const diffLabel = diff === 0 ? 'E' : (diff > 0 ? '+' + diff : diff);
+    const div = document.createElement('div');
+    div.className = 'round-card';
+    div.innerHTML = `
+      <div>
+        <div class="rc-course">${r.course}</div>
+        <div class="rc-date">${r.date}</div>
+      </div>
+      <div style="display:flex; align-items:center;">
+        <span class="rc-score ${diffClass}">${r.totalScore} (${diffLabel})</span>
+        <button class="del" data-idx="${idx}">remove</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+  container.querySelectorAll('.del').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const idx = Number(e.target.dataset.idx);
+      const rounds = JSON.parse(localStorage.getItem('loop_rounds') || '[]');
+      rounds.splice(idx, 1);
+      localStorage.setItem('loop_rounds', JSON.stringify(rounds));
+      renderPastRounds();
+    });
+  });
+}
+
+// ---------- Tab switching ----------
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const target = tab.dataset.tab;
+    document.getElementById('tab-scorecard').classList.toggle('hidden', target !== 'scorecard');
+    document.getElementById('tab-caddy').classList.toggle('hidden', target !== 'caddy');
+  });
+});
+
+// ---------- Caddy: club recommender ----------
+// Rough average carry distances (yards) — a reasonable mid-handicap baseline
+const clubDistances = [
+  { club: 'Pitching Wedge', dist: 110 },
+  { club: '9 Iron', dist: 125 },
+  { club: '8 Iron', dist: 135 },
+  { club: '7 Iron', dist: 145 },
+  { club: '6 Iron', dist: 155 },
+  { club: '5 Iron', dist: 165 },
+  { club: '4 Iron / Hybrid', dist: 175 },
+  { club: '5 Wood', dist: 195 },
+  { club: '3 Wood', dist: 215 },
+  { club: 'Driver', dist: 240 }
+];
+
+document.getElementById('recommendBtn').addEventListener('click', () => {
+  let yardage = Number(document.getElementById('yardageInput').value);
+  const condition = document.getElementById('conditionInput').value;
+  if (!yardage || yardage <= 0) {
+    alert('Enter a distance to the pin first.');
+    return;
+  }
+
+  let adjusted = yardage;
+  let note = '';
+  if (condition === 'headwind') { adjusted += 15; note = 'Adjusted +15 yds for the wind — club up.'; }
+  if (condition === 'tailwind') { adjusted -= 10; note = 'Adjusted -10 yds for the wind — club down.'; }
+  if (condition === 'uphill') { adjusted += 8; note = 'Adjusted +8 yds — uphill lies play longer.'; }
+  if (condition === 'downhill') { adjusted -= 8; note = 'Adjusted -8 yds — downhill lies play shorter.'; }
+  if (!note) note = 'No adjustment needed for flat, calm conditions.';
+
+  let best = clubDistances[0];
+  let bestDiff = Infinity;
+  clubDistances.forEach(c => {
+    const diff = Math.abs(c.dist - adjusted);
+    if (diff < bestDiff) { bestDiff = diff; best = c; }
+  });
+
+  document.getElementById('clubName').textContent = best.club;
+  document.getElementById('clubNote').textContent = `Playing ~${Math.round(adjusted)} yds. ${note}`;
+  document.getElementById('clubResult').classList.remove('hidden');
+});
+
+// ---------- Caddy: tips library ----------
+const tipsData = [
+  {
+    category: 'Driving',
+    tips: [
+      'Tee the ball so half of it sits above the driver face at address — a common cause of low, weak drives is teeing too low.',
+      'Widen your stance slightly beyond shoulder width for more stability on full swings.',
+      'Pick a specific, narrow target (a tree, a sprinkler head) rather than just "the fairway" — specificity improves aim.'
+    ]
+  },
+  {
+    category: 'Putting',
+    tips: [
+      'Read the putt from behind the ball and again from behind the hole — slopes often look different from each side.',
+      'Keep your head still through impact; a common miss is peeking early to watch the ball.',
+      'On lag putts, prioritize distance control over the exact line — a putt that finishes 2 feet short or long is more useful than one that\'s dead-on line but 6 feet away.'
+    ]
+  },
+  {
+    category: 'Bunker play',
+    tips: [
+      'Open the clubface before taking your grip, not after — this keeps the bounce working for you.',
+      'Aim to enter the sand about 1-2 inches behind the ball, not directly at it.',
+      'Follow all the way through — decelerating into the sand is the most common cause of chunked bunker shots.'
+    ]
+  },
+  {
+    category: 'Course management',
+    tips: [
+      'Play to the fat part of the green, not always at the flag — a 30-foot putt from the center is often a better outcome than a bunker shot from missing at a tucked pin.',
+      'On tee shots with trouble on one side, tee up on that same side to angle your shot away from it.',
+      'When in doubt, take the club that gets you to the hole with a smooth swing rather than a full, forced effort.'
+    ]
+  }
+];
+
+const tipsContainer = document.getElementById('tipsList');
+tipsData.forEach(cat => {
+  const details = document.createElement('details');
+  details.className = 'tips-cat';
+  details.innerHTML = `
+    <summary>${cat.category}</summary>
+    <ul>${cat.tips.map(t => `<li>${t}</li>`).join('')}</ul>
+  `;
+  tipsContainer.appendChild(details);
+});
+
+// ---------- Init ----------
+renderScorecard();
+renderPastRounds();
+</script>
+</body>
+</html>
