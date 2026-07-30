@@ -1,0 +1,16 @@
+diff --git a/index.html b/index.html
+index 620e0f5..fe40bc8 100644
+--- a/index.html
++++ b/index.html
+@@ -563,9 +563,9 @@
+   <div class="app-header">
+     <div class="mark">
+       <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+-        <circle cx="17" cy="17" r="15.5" stroke="#F4EFE1" stroke-width="1.5" stroke-dasharray="2 3"/>
++        <circle cx="17" cy="17" r="15.5" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 3"/>
+         <path d="M17 6L17 22" stroke="#A63446" stroke-width="2" stroke-linecap="round"/>
+-        <path d="M17 6L26 9.5L17 12.5Z" fill="#F4EFE1"/>
++        <path d="M17 6L26 9.5L17 12.5Z" fill="currentColor"/>
+       </svg>
+       Loop
+     </div>
