@@ -151,7 +151,7 @@
     gap: 10px;
     margin-bottom: 18px;
   }
-  .round-meta input {
+  .round-meta input, .round-meta select {
     flex: 1;
     padding: 10px 12px;
     border: 1px solid var(--bunker-tan);
@@ -473,9 +473,17 @@
       <p class="section-sub">Enter your score hole by hole — Loop keeps the running total.</p>
 
       <div class="round-meta">
+        <select id="courseSelect" style="flex: 1;">
+          <option value="">— Load a saved course —</option>
+        </select>
+      </div>
+
+      <div class="round-meta">
         <input type="text" id="courseName" placeholder="Course name">
         <input type="date" id="roundDate">
       </div>
+
+      <button class="primary" id="saveCourseBtn" style="background: var(--ink-soft); margin-bottom: 16px;">Save this course's pars for next time</button>
 
       <table class="scorecard" id="scorecardTable">
         <thead>
@@ -579,6 +587,108 @@
 // ---------- Scorecard logic ----------
 const scorecardBody = document.getElementById('scorecardBody');
 let holes = Array.from({length: 18}, (_, i) => ({ hole: i+1, par: 4, score: '' }));
+
+// Verified hole-by-hole par data, sourced directly from each course's own site
+// or a matching, cross-checked scorecard (not guessed).
+const builtInCourses = [
+  {
+    name: "Pigeon Creek Golf Course (West Olive)",
+    pars: [4,3,5,4,4,4,3,4,4, 4,3,5,4,4,4,5,3,4]
+  },
+  {
+    name: "Three Fires — Flame/Blaze (Holland)",
+    pars: [5,3,5,4,4,4,4,3,4, 4,4,4,3,4,3,5,4,5]
+  },
+  {
+    name: "Three Fires — Blaze/Smoke (Holland)",
+    pars: [4,4,4,3,4,3,5,4,5, 4,4,3,4,4,4,4,5,3]
+  },
+  {
+    name: "Three Fires — Flame/Smoke (Holland)",
+    pars: [5,3,5,4,4,4,4,3,4, 4,4,3,4,4,4,4,5,3]
+  },
+  {
+    name: "Winding Creek — White/Blue (Holland)",
+    pars: [4,4,5,4,3,5,4,3,4, 4,4,4,5,3,4,5,3,4]
+  },
+  {
+    name: "Winding Creek — Blue/Gold (Holland)",
+    pars: [4,4,4,5,3,4,5,3,4, 3,5,4,3,4,4,4,4,3]
+  },
+  {
+    name: "Winding Creek — Gold/White (Holland)",
+    pars: [3,5,4,3,4,4,4,4,3, 4,4,5,4,3,5,4,3,4]
+  }
+];
+
+function getSavedCourses() {
+  return JSON.parse(localStorage.getItem('loop_courses') || '[]');
+}
+
+function renderCourseSelect() {
+  const select = document.getElementById('courseSelect');
+  select.innerHTML = '<option value="">— Load a saved course —</option>';
+
+  const group1 = document.createElement('optgroup');
+  group1.label = 'Preloaded (Michigan)';
+  builtInCourses.forEach((c, idx) => {
+    const opt = document.createElement('option');
+    opt.value = 'built:' + idx;
+    opt.textContent = c.name;
+    group1.appendChild(opt);
+  });
+  select.appendChild(group1);
+
+  const saved = getSavedCourses();
+  if (saved.length > 0) {
+    const group2 = document.createElement('optgroup');
+    group2.label = 'My saved courses';
+    saved.forEach((c, idx) => {
+      const opt = document.createElement('option');
+      opt.value = 'saved:' + idx;
+      opt.textContent = c.name;
+      group2.appendChild(opt);
+    });
+    select.appendChild(group2);
+  }
+}
+
+document.getElementById('courseSelect').addEventListener('change', (e) => {
+  const val = e.target.value;
+  if (!val) return;
+  const [kind, idxStr] = val.split(':');
+  const idx = Number(idxStr);
+  const course = kind === 'built' ? builtInCourses[idx] : getSavedCourses()[idx];
+  if (!course) return;
+
+  document.getElementById('courseName').value = course.name;
+  course.pars.forEach((par, i) => {
+    if (holes[i]) holes[i].par = par;
+  });
+  renderScorecard();
+});
+
+document.getElementById('saveCourseBtn').addEventListener('click', () => {
+  const name = document.getElementById('courseName').value.trim();
+  if (!name) {
+    alert('Enter a course name first so Loop knows what to call it.');
+    return;
+  }
+  const pars = holes.map(h => Number(h.par) || 4);
+  const saved = getSavedCourses();
+  const existingIdx = saved.findIndex(c => c.name.toLowerCase() === name.toLowerCase());
+  if (existingIdx >= 0) {
+    saved[existingIdx].pars = pars;
+  } else {
+    saved.push({ name, pars });
+  }
+  localStorage.setItem('loop_courses', JSON.stringify(saved));
+  renderCourseSelect();
+  const btn = document.getElementById('saveCourseBtn');
+  const original = btn.textContent;
+  btn.textContent = 'Saved ✓';
+  setTimeout(() => { btn.textContent = original; }, 1200);
+});
 
 function renderScorecard() {
   scorecardBody.innerHTML = '';
@@ -1181,6 +1291,7 @@ qaData.forEach(item => {
 });
 
 // ---------- Init ----------
+renderCourseSelect();
 renderScorecard();
 renderPastRounds();
 renderStats();
