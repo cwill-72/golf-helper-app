@@ -241,6 +241,56 @@
     border-top: 1px dashed var(--bunker-tan);
     padding-top: 16px;
   }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .stats-card {
+    background: var(--fairway-deep);
+    color: var(--paper);
+    border-radius: 10px;
+    padding: 14px 8px;
+    text-align: center;
+  }
+  .stats-card .stats-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    display: block;
+  }
+  .stats-card .stats-lbl {
+    font-size: 0.62rem;
+    color: var(--bunker-tan);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: block;
+    margin-top: 2px;
+  }
+  .trend-line {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 60px;
+    padding: 10px 4px 0;
+    margin-bottom: 6px;
+  }
+  .trend-bar {
+    flex: 1;
+    background: var(--fairway-light);
+    border-radius: 3px 3px 0 0;
+    min-height: 4px;
+    position: relative;
+  }
+  .trend-bar.best { background: var(--flag-red); }
+  .trend-note {
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    text-align: center;
+    margin: 0 0 16px;
+  }
   .round-card {
     display: flex;
     justify-content: space-between;
@@ -426,6 +476,12 @@
       <button class="primary" id="saveRoundBtn">Save round</button>
 
       <div class="past-rounds">
+        <h2 class="section-title">Your stats</h2>
+        <p class="section-sub">Based on all rounds you've saved.</p>
+        <div id="statsPanel"></div>
+      </div>
+
+      <div class="past-rounds">
         <h2 class="section-title">Past rounds</h2>
         <div id="pastRoundsList"><p class="empty-note">No rounds saved yet — finish one above and save it.</p></div>
       </div>
@@ -558,7 +614,65 @@ document.getElementById('saveRoundBtn').addEventListener('click', () => {
   document.getElementById('roundDate').value = '';
   renderScorecard();
   renderPastRounds();
+  renderStats();
 });
+
+function renderStats() {
+  const rounds = JSON.parse(localStorage.getItem('loop_rounds') || '[]');
+  const panel = document.getElementById('statsPanel');
+
+  if (rounds.length === 0) {
+    panel.innerHTML = '<p class="empty-note">Save a few rounds to see your stats here.</p>';
+    return;
+  }
+
+  const diffs = rounds.map(r => r.totalScore - r.totalPar);
+  const avgDiff = diffs.reduce((a,b)=>a+b,0) / diffs.length;
+  const best = rounds.reduce((b, r) => (r.totalScore - r.totalPar) < (b.totalScore - b.totalPar) ? r : b, rounds[0]);
+  const avgScore = rounds.reduce((a,r)=>a+r.totalScore,0) / rounds.length;
+
+  const avgLabel = avgDiff === 0 ? 'E' : (avgDiff > 0 ? '+' + avgDiff.toFixed(1) : avgDiff.toFixed(1));
+  const bestDiff = best.totalScore - best.totalPar;
+  const bestLabel = bestDiff === 0 ? 'E' : (bestDiff > 0 ? '+' + bestDiff : bestDiff);
+
+  let html = `
+    <div class="stats-grid">
+      <div class="stats-card">
+        <span class="stats-num">${rounds.length}</span>
+        <span class="stats-lbl">Rounds</span>
+      </div>
+      <div class="stats-card">
+        <span class="stats-num">${avgScore.toFixed(1)}</span>
+        <span class="stats-lbl">Avg score</span>
+      </div>
+      <div class="stats-card">
+        <span class="stats-num">${best.totalScore}</span>
+        <span class="stats-lbl">Best (${bestLabel})</span>
+      </div>
+    </div>
+  `;
+
+  // Simple trend chart — last 8 rounds, oldest to newest (rounds are stored newest-first)
+  const recent = rounds.slice(0, 8).reverse();
+  if (recent.length > 1) {
+    const scores = recent.map(r => r.totalScore);
+    const min = Math.min(...scores);
+    const max = Math.max(...scores);
+    const range = Math.max(max - min, 1);
+    const bestScore = Math.min(...scores);
+
+    html += '<div class="trend-line">';
+    recent.forEach(r => {
+      const heightPct = 15 + ((r.totalScore - min) / range) * 85;
+      const isBest = r.totalScore === bestScore;
+      html += `<div class="trend-bar ${isBest ? 'best' : ''}" style="height:${heightPct}%" title="${r.course}: ${r.totalScore}"></div>`;
+    });
+    html += '</div>';
+    html += `<p class="trend-note">Last ${recent.length} rounds, oldest to newest — red marks your best</p>`;
+  }
+
+  panel.innerHTML = html;
+}
 
 function renderPastRounds() {
   const rounds = JSON.parse(localStorage.getItem('loop_rounds') || '[]');
@@ -593,6 +707,7 @@ function renderPastRounds() {
       rounds.splice(idx, 1);
       localStorage.setItem('loop_rounds', JSON.stringify(rounds));
       renderPastRounds();
+      renderStats();
     });
   });
 }
@@ -754,6 +869,7 @@ tipsData.forEach(cat => {
 // ---------- Init ----------
 renderScorecard();
 renderPastRounds();
+renderStats();
 </script>
 </body>
 </html>
