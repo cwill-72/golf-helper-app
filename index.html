@@ -282,6 +282,35 @@
     background: #fff;
   }
 
+  .club-dist-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--paper-dark);
+  }
+  .club-dist-row label {
+    font-size: 0.88rem;
+    color: var(--ink);
+    flex: 1;
+  }
+  .club-dist-row input {
+    width: 70px;
+    padding: 8px;
+    border: 1px solid var(--bunker-tan);
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    text-align: center;
+    background: #fff;
+  }
+  .club-dist-row .yds-lbl {
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    width: 30px;
+  }
+
   .club-result {
     background: var(--fairway-deep);
     color: var(--paper);
@@ -397,8 +426,17 @@
 
     <!-- CADDY TAB -->
     <div id="tab-caddy" class="hidden">
+      <h2 class="section-title">My club distances</h2>
+      <p class="section-sub">Enter your real carry distances — Loop remembers these on this device.</p>
+
+      <div id="clubDistancesList"></div>
+      <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <button class="primary" id="saveClubsBtn" style="flex:2;">Save distances</button>
+        <button class="primary" id="resetClubsBtn" style="flex:1; background: var(--ink-soft);">Reset</button>
+      </div>
+
       <h2 class="section-title">Club recommender</h2>
-      <p class="section-sub">Ballpark suggestion based on typical distances — dial it in over time.</p>
+      <p class="section-sub">Suggests a club based on your saved distances above.</p>
 
       <div class="club-form">
         <div>
@@ -564,8 +602,9 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // ---------- Caddy: club recommender ----------
-// Rough average carry distances (yards) — a reasonable mid-handicap baseline
-const clubDistances = [
+// Rough average carry distances (yards) — a reasonable mid-handicap baseline,
+// used only until the person enters their own real numbers below.
+const defaultClubDistances = [
   { club: 'Pitching Wedge', dist: 110 },
   { club: '9 Iron', dist: 125 },
   { club: '8 Iron', dist: 135 },
@@ -577,6 +616,58 @@ const clubDistances = [
   { club: '3 Wood', dist: 215 },
   { club: 'Driver', dist: 240 }
 ];
+
+let clubDistances = JSON.parse(JSON.stringify(defaultClubDistances));
+
+function loadClubDistances() {
+  const saved = localStorage.getItem('loop_clubs');
+  if (saved) {
+    try {
+      clubDistances = JSON.parse(saved);
+    } catch (e) {
+      clubDistances = JSON.parse(JSON.stringify(defaultClubDistances));
+    }
+  }
+}
+
+function renderClubDistancesForm() {
+  const container = document.getElementById('clubDistancesList');
+  container.innerHTML = '';
+  clubDistances.forEach((c, idx) => {
+    const row = document.createElement('div');
+    row.className = 'club-dist-row';
+    row.innerHTML = `
+      <label>${c.club}</label>
+      <input type="number" min="20" max="400" value="${c.dist}" data-idx="${idx}">
+      <span class="yds-lbl">yds</span>
+    `;
+    container.appendChild(row);
+  });
+  container.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const idx = Number(e.target.dataset.idx);
+      clubDistances[idx].dist = Number(e.target.value) || clubDistances[idx].dist;
+    });
+  });
+}
+
+document.getElementById('saveClubsBtn').addEventListener('click', () => {
+  localStorage.setItem('loop_clubs', JSON.stringify(clubDistances));
+  const btn = document.getElementById('saveClubsBtn');
+  const original = btn.textContent;
+  btn.textContent = 'Saved ✓';
+  setTimeout(() => { btn.textContent = original; }, 1200);
+});
+
+document.getElementById('resetClubsBtn').addEventListener('click', () => {
+  if (!confirm('Reset all club distances back to the default averages?')) return;
+  clubDistances = JSON.parse(JSON.stringify(defaultClubDistances));
+  localStorage.removeItem('loop_clubs');
+  renderClubDistancesForm();
+});
+
+loadClubDistances();
+renderClubDistancesForm();
 
 document.getElementById('recommendBtn').addEventListener('click', () => {
   let yardage = Number(document.getElementById('yardageInput').value);
