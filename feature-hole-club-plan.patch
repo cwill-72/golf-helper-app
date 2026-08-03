@@ -1,0 +1,239 @@
+diff --git a/index.html b/index.html
+index 051560f..4799342 100644
+--- a/index.html
++++ b/index.html
+@@ -198,6 +198,41 @@
+     gap: 10px;
+     margin-bottom: 18px;
+   }
++  .hole-plan-list {
++    margin-bottom: 18px;
++  }
++  .hole-plan-row {
++    display: flex;
++    align-items: center;
++    justify-content: space-between;
++    padding: 8px 10px;
++    background: #fff;
++    border: 1px solid var(--paper-dark);
++    border-radius: 8px;
++    margin-bottom: 6px;
++    font-size: 0.82rem;
++  }
++  .hole-plan-row .hp-hole {
++    font-family: 'JetBrains Mono', monospace;
++    font-weight: 700;
++    color: var(--fairway-deep);
++    width: 60px;
++    flex-shrink: 0;
++  }
++  .hole-plan-row .hp-yardage {
++    color: var(--ink-soft);
++    width: 70px;
++    flex-shrink: 0;
++    font-family: 'JetBrains Mono', monospace;
++    font-size: 0.78rem;
++  }
++  .hole-plan-row .hp-club {
++    font-weight: 600;
++    color: var(--flag-red);
++    text-align: right;
++    flex: 1;
++  }
++
+   .round-len-toggle {
+     display: flex;
+     gap: 8px;
+@@ -629,6 +664,12 @@
+         <div class="stat"><span class="num" id="totalDiff">E</span><span class="lbl">To Par</span></div>
+       </div>
+ 
++      <div id="holePlanSection" class="hidden">
++        <h2 class="section-title" style="font-size:1.05rem;">Hole-by-hole club plan</h2>
++        <p class="section-sub">Based on this course's yardages and your saved club distances.</p>
++        <div id="holePlanList" class="hole-plan-list"></div>
++      </div>
++
+       <textarea id="roundNotes" placeholder="Notes about this round (conditions, what worked, etc.)" style="width:100%; min-height:56px; padding:10px 12px; border:1px solid var(--bunker-tan); border-radius:8px; font-family:'Work Sans',sans-serif; font-size:0.85rem; margin-bottom:14px; resize:vertical; background:#fff; color:var(--ink);"></textarea>
+ 
+       <button class="primary" id="saveRoundBtn">Save round</button>
+@@ -806,9 +847,9 @@ const scorecardBody = document.getElementById('scorecardBody');
+ let roundLength = '18';
+ 
+ function createHoles(length) {
+-  if (length === 'front9') return Array.from({length: 9}, (_, i) => ({ hole: i+1, par: 4, score: '', putts: '', gir: false, club: '' }));
+-  if (length === 'back9') return Array.from({length: 9}, (_, i) => ({ hole: i+10, par: 4, score: '', putts: '', gir: false, club: '' }));
+-  return Array.from({length: 18}, (_, i) => ({ hole: i+1, par: 4, score: '', putts: '', gir: false, club: '' }));
++  if (length === 'front9') return Array.from({length: 9}, (_, i) => ({ hole: i+1, par: 4, score: '', putts: '', gir: false, club: '', yardage: 0 }));
++  if (length === 'back9') return Array.from({length: 9}, (_, i) => ({ hole: i+10, par: 4, score: '', putts: '', gir: false, club: '', yardage: 0 }));
++  return Array.from({length: 18}, (_, i) => ({ hole: i+1, par: 4, score: '', putts: '', gir: false, club: '', yardage: 0 }));
+ }
+ 
+ let holes = createHoles(roundLength);
+@@ -820,6 +861,7 @@ document.querySelectorAll('.len-btn').forEach(btn => {
+     roundLength = btn.dataset.len;
+     holes = createHoles(roundLength);
+     renderScorecard();
++    renderHolePlan();
+   });
+ });
+ 
+@@ -828,31 +870,38 @@ document.querySelectorAll('.len-btn').forEach(btn => {
+ const builtInCourses = [
+   {
+     name: "Pigeon Creek Golf Course (West Olive)",
+-    pars: [4,3,5,4,4,4,3,4,4, 4,3,5,4,4,4,5,3,4]
++    pars: [4,3,5,4,4,4,3,4,4, 4,3,5,4,4,4,5,3,4],
++    yardages: [358,176,506,401,397,346,123,282,395, 337,167,453,354,337,334,476,193,394]
+   },
+   {
+     name: "Three Fires — Flame/Blaze (Holland)",
+-    pars: [5,3,5,4,4,4,4,3,4, 4,4,4,3,4,3,5,4,5]
++    pars: [5,3,5,4,4,4,4,3,4, 4,4,4,3,4,3,5,4,5],
++    yardages: [404,118,419,396,270,260,341,145,331, 291,359,309,168,274,111,406,327,400]
+   },
+   {
+     name: "Three Fires — Blaze/Smoke (Holland)",
+-    pars: [4,4,4,3,4,3,5,4,5, 4,4,3,4,4,4,4,5,3]
++    pars: [4,4,4,3,4,3,5,4,5, 4,4,3,4,4,4,4,5,3],
++    yardages: [291,359,309,168,274,111,406,327,400, 373,305,130,282,282,278,294,399,130]
+   },
+   {
+     name: "Three Fires — Flame/Smoke (Holland)",
+-    pars: [5,3,5,4,4,4,4,3,4, 4,4,3,4,4,4,4,5,3]
++    pars: [5,3,5,4,4,4,4,3,4, 4,4,3,4,4,4,4,5,3],
++    yardages: [404,118,419,396,270,260,341,145,331, 373,305,130,282,282,278,294,399,130]
+   },
+   {
+     name: "Winding Creek — White/Blue (Holland)",
+-    pars: [4,4,5,4,3,5,4,3,4, 4,4,4,5,3,4,5,3,4]
++    pars: [4,4,5,4,3,5,4,3,4, 4,4,4,5,3,4,5,3,4],
++    yardages: [360,425,560,365,160,535,300,140,415, 440,350,365,460,190,405,525,210,460]
+   },
+   {
+     name: "Winding Creek — Blue/Gold (Holland)",
+-    pars: [4,4,4,5,3,4,5,3,4, 3,5,4,3,4,4,4,4,3]
++    pars: [4,4,4,5,3,4,5,3,4, 3,5,4,3,4,4,4,4,3],
++    yardages: [440,350,365,460,190,405,525,210,460, 175,480,310,125,360,350,315,335,150]
+   },
+   {
+     name: "Winding Creek — Gold/White (Holland)",
+-    pars: [3,5,4,3,4,4,4,4,3, 4,4,5,4,3,5,4,3,4]
++    pars: [3,5,4,3,4,4,4,4,3, 4,4,5,4,3,5,4,3,4],
++    yardages: [175,480,310,125,360,350,315,335,150, 360,425,560,365,160,535,300,140,415]
+   }
+ ];
+ 
+@@ -921,8 +970,18 @@ document.getElementById('courseSelect').addEventListener('change', (e) => {
+   parsToApply.forEach((par, i) => {
+     if (holes[i]) holes[i].par = par;
+   });
++  if (course.yardages) {
++    const yardagesToApply = holes.length === 18 ? course.yardages
++      : (roundLength === 'front9' ? course.yardages.slice(0, 9) : course.yardages.slice(9, 18));
++    yardagesToApply.forEach((yd, i) => {
++      if (holes[i]) holes[i].yardage = yd;
++    });
++  } else {
++    holes.forEach(h => h.yardage = 0);
++  }
+   loadCourseNotesForCurrentName();
+   renderScorecard();
++  renderHolePlan();
+ });
+ 
+ document.getElementById('saveCourseBtn').addEventListener('click', () => {
+@@ -960,6 +1019,32 @@ function clubOptionsHtml(selected) {
+   return opts;
+ }
+ 
++function renderHolePlan() {
++  const section = document.getElementById('holePlanSection');
++  const list = document.getElementById('holePlanList');
++  const hasYardages = holes.some(h => h.yardage && h.yardage > 0);
++
++  if (!hasYardages) {
++    section.classList.add('hidden');
++    return;
++  }
++
++  section.classList.remove('hidden');
++  list.innerHTML = '';
++  holes.forEach(h => {
++    if (!h.yardage || h.yardage <= 0) return;
++    const suggestion = suggestClubForYardage(h.yardage);
++    const row = document.createElement('div');
++    row.className = 'hole-plan-row';
++    row.innerHTML = `
++      <span class="hp-hole">Hole ${h.hole} · Par ${h.par}</span>
++      <span class="hp-yardage">${h.yardage} yds</span>
++      <span class="hp-club">${suggestion.club}</span>
++    `;
++    list.appendChild(row);
++  });
++}
++
+ function renderScorecard() {
+   scorecardBody.innerHTML = '';
+   const is18 = holes.length === 18;
+@@ -1058,6 +1143,7 @@ document.getElementById('saveRoundBtn').addEventListener('click', () => {
+   document.getElementById('roundDate').value = '';
+   document.getElementById('roundNotes').value = '';
+   renderScorecard();
++  renderHolePlan();
+   renderPastRounds();
+   renderStats();
+ });
+@@ -1433,6 +1519,7 @@ document.getElementById('saveClubsBtn').addEventListener('click', () => {
+   const original = btn.textContent;
+   btn.textContent = 'Saved ✓';
+   setTimeout(() => { btn.textContent = original; }, 1200);
++  renderHolePlan();
+ });
+ 
+ document.getElementById('resetClubsBtn').addEventListener('click', () => {
+@@ -1440,11 +1527,22 @@ document.getElementById('resetClubsBtn').addEventListener('click', () => {
+   clubDistances = JSON.parse(JSON.stringify(defaultClubDistances));
+   localStorage.removeItem(k('clubs'));
+   renderClubDistancesForm();
++  renderHolePlan();
+ });
+ 
+ loadClubDistances();
+ renderClubDistancesForm();
+ 
++function suggestClubForYardage(yardage) {
++  let best = clubDistances[0];
++  let bestDiff = Infinity;
++  clubDistances.forEach(c => {
++    const diff = Math.abs(c.dist - yardage);
++    if (diff < bestDiff) { bestDiff = diff; best = c; }
++  });
++  return best;
++}
++
+ document.getElementById('recommendBtn').addEventListener('click', () => {
+   let yardage = Number(document.getElementById('yardageInput').value);
+   const condition = document.getElementById('conditionInput').value;
+@@ -1461,12 +1559,7 @@ document.getElementById('recommendBtn').addEventListener('click', () => {
+   if (condition === 'downhill') { adjusted -= 8; note = 'Adjusted -8 yds — downhill lies play shorter.'; }
+   if (!note) note = 'No adjustment needed for flat, calm conditions.';
+ 
+-  let best = clubDistances[0];
+-  let bestDiff = Infinity;
+-  clubDistances.forEach(c => {
+-    const diff = Math.abs(c.dist - adjusted);
+-    if (diff < bestDiff) { bestDiff = diff; best = c; }
+-  });
++  const best = suggestClubForYardage(adjusted);
+ 
+   document.getElementById('clubName').textContent = best.club;
+   document.getElementById('clubNote').textContent = `Playing ~${Math.round(adjusted)} yds. ${note}`;
+@@ -1880,6 +1973,7 @@ qaData.forEach(item => {
+ renderProfileSelect();
+ renderCourseSelect();
+ renderScorecard();
++renderHolePlan();
+ renderPastRounds();
+ renderStats();
+ renderPracticeList();
