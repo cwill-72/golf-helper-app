@@ -450,6 +450,10 @@
     background: none; border: none; color: var(--ink-soft); cursor: pointer;
     font-size: 0.75rem; text-decoration: underline; padding: 0 0 0 10px;
   }
+  .round-card button.share-round {
+    background: none; border: none; color: var(--fairway-mid); cursor: pointer;
+    font-size: 0.75rem; text-decoration: underline; padding: 0 0 0 10px;
+  }
   .empty-note { color: var(--ink-soft); font-size: 0.85rem; font-style: italic; }
 
   /* Caddy tab */
@@ -476,6 +480,26 @@
     font-family: 'Work Sans', sans-serif;
     font-size: 0.9rem;
     background: #fff;
+  }
+
+  .checklist-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--paper-dark);
+  }
+  .checklist-row label {
+    flex: 1;
+    font-size: 0.88rem;
+    color: var(--ink);
+  }
+  .checklist-row.checked label {
+    text-decoration: line-through;
+    color: var(--ink-soft);
+  }
+  .checklist-row .del-item {
+    background: none; border: none; color: var(--ink-soft); cursor: pointer; font-size: 0.9rem;
   }
 
   .club-dist-row {
@@ -652,7 +676,7 @@
       <table class="scorecard" id="scorecardTable">
         <thead>
           <tr>
-            <th>Hole</th><th>Par</th><th>Score</th><th>Putts</th><th>GIR</th><th>Club</th>
+            <th>Hole</th><th>Par</th><th>Score</th><th>Putts</th><th>GIR</th><th>FIR</th><th>Club</th>
           </tr>
         </thead>
         <tbody id="scorecardBody"></tbody>
@@ -677,13 +701,32 @@
       <div class="past-rounds">
         <h2 class="section-title">Your stats</h2>
         <p class="section-sub">Based on all rounds you've saved.</p>
+        <div class="round-meta" style="margin-bottom:12px;">
+          <input type="number" id="goalInput" placeholder="Target scoring average (e.g. 88)">
+          <button class="primary" id="saveGoalBtn" style="flex: 0 0 70px;">Set</button>
+        </div>
+        <div id="goalProgress"></div>
         <div id="statsPanel"></div>
+      </div>
+
+      <div class="past-rounds">
+        <h2 class="section-title">Compare rounds</h2>
+        <p class="section-sub">See two rounds side by side, hole by hole.</p>
+        <div class="round-meta">
+          <select id="compareRoundA"><option value="">— Round A —</option></select>
+          <select id="compareRoundB"><option value="">— Round B —</option></select>
+        </div>
+        <button class="primary" id="compareRoundsBtn" style="margin-bottom:16px;">Compare</button>
+        <div id="compareResult"></div>
       </div>
 
       <div class="past-rounds">
         <h2 class="section-title">Past rounds</h2>
         <div id="pastRoundsList"><p class="empty-note">No rounds saved yet — finish one above and save it.</p></div>
         <button class="primary" id="exportCsvBtn" style="background: var(--ink-soft); margin-top:10px;">Export all rounds as CSV</button>
+        <button class="primary" id="backupBtn" style="background: var(--fairway-mid); margin-top:10px;">Download full backup (everything)</button>
+        <label for="restoreInput" class="primary" style="display:block; text-align:center; background: var(--bunker-tan); color: var(--ink); margin-top:10px; cursor:pointer;">Restore from backup file</label>
+        <input type="file" id="restoreInput" accept="application/json" style="display:none;">
       </div>
     </div>
 
@@ -731,6 +774,15 @@
         <div class="club-name" id="weatherTemp" style="font-size:1.6rem;">—</div>
         <div class="club-note" id="weatherWind"></div>
       </div>
+
+      <h2 class="section-title" style="margin-top:26px;">Pre-round checklist</h2>
+      <p class="section-sub">Tick off before you head out — resets each time you tap "Reset".</p>
+      <div id="checklistItems"></div>
+      <div class="round-meta" style="margin-top:10px;">
+        <input type="text" id="checklistNewItem" placeholder="Add an item...">
+        <button class="primary" id="addChecklistItemBtn" style="flex: 0 0 70px;">Add</button>
+      </div>
+      <button class="primary" id="resetChecklistBtn" style="background: var(--ink-soft); margin-top:10px; margin-bottom:16px;">Reset checklist</button>
 
       <h2 class="section-title" style="margin-top:26px;">Practice log</h2>
       <p class="section-sub">Track range sessions separately from real rounds.</p>
@@ -847,9 +899,9 @@ const scorecardBody = document.getElementById('scorecardBody');
 let roundLength = '18';
 
 function createHoles(length) {
-  if (length === 'front9') return Array.from({length: 9}, (_, i) => ({ hole: i+1, par: 4, score: '', putts: '', gir: false, club: '', yardage: 0 }));
-  if (length === 'back9') return Array.from({length: 9}, (_, i) => ({ hole: i+10, par: 4, score: '', putts: '', gir: false, club: '', yardage: 0 }));
-  return Array.from({length: 18}, (_, i) => ({ hole: i+1, par: 4, score: '', putts: '', gir: false, club: '', yardage: 0 }));
+  if (length === 'front9') return Array.from({length: 9}, (_, i) => ({ hole: i+1, par: 4, score: '', putts: '', gir: false, fairway: false, club: '', yardage: 0 }));
+  if (length === 'back9') return Array.from({length: 9}, (_, i) => ({ hole: i+10, par: 4, score: '', putts: '', gir: false, fairway: false, club: '', yardage: 0 }));
+  return Array.from({length: 18}, (_, i) => ({ hole: i+1, par: 4, score: '', putts: '', gir: false, fairway: false, club: '', yardage: 0 }));
 }
 
 let holes = createHoles(roundLength);
@@ -1057,6 +1109,7 @@ function renderScorecard() {
       <td><input type="number" min="1" max="15" value="${h.score}" data-idx="${idx}" data-field="score" placeholder="-"></td>
       <td><input type="number" min="0" max="6" value="${h.putts}" data-idx="${idx}" data-field="putts" placeholder="-" style="width:28px;"></td>
       <td><input type="checkbox" data-idx="${idx}" data-field="gir" ${h.gir ? 'checked' : ''}></td>
+      <td>${Number(h.par) === 3 ? '—' : `<input type="checkbox" data-idx="${idx}" data-field="fairway" ${h.fairway ? 'checked' : ''}>`}</td>
       <td><select data-idx="${idx}" data-field="club" class="club-select">${clubOptionsHtml(h.club)}</select></td>
     `;
     scorecardBody.appendChild(tr);
@@ -1083,7 +1136,9 @@ function subtotalRow(label, subset) {
   const scoreSum = subset.reduce((a,h)=>a+Number(h.score||0),0);
   const puttsSum = subset.reduce((a,h)=>a+Number(h.putts||0),0);
   const girCount = subset.filter(h => h.gir).length;
-  tr.innerHTML = `<td>${label}</td><td>${parSum}</td><td>${scoreSum || '-'}</td><td>${puttsSum || '-'}</td><td>${girCount}/${subset.length}</td><td></td>`;
+  const firEligible = subset.filter(h => Number(h.par) !== 3).length;
+  const firCount = subset.filter(h => h.fairway).length;
+  tr.innerHTML = `<td>${label}</td><td>${parSum}</td><td>${scoreSum || '-'}</td><td>${puttsSum || '-'}</td><td>${girCount}/${subset.length}</td><td>${firCount}/${firEligible}</td><td></td>`;
   return tr;
 }
 
@@ -1093,7 +1148,7 @@ function attachInputListeners() {
     inp.addEventListener(evt, e => {
       const idx = e.target.dataset.idx;
       const field = e.target.dataset.field;
-      holes[idx][field] = field === 'gir' ? e.target.checked : e.target.value;
+      holes[idx][field] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
       updateTotals();
     });
   });
@@ -1146,6 +1201,43 @@ document.getElementById('saveRoundBtn').addEventListener('click', () => {
   renderHolePlan();
   renderPastRounds();
   renderStats();
+  renderGoalProgress();
+  renderCompareOptions();
+});
+
+function getGoal() {
+  const g = localStorage.getItem(k('goal'));
+  return g ? JSON.parse(g) : null;
+}
+function setGoalValue(val) { localStorage.setItem(k('goal'), JSON.stringify({ targetAvg: val })); }
+
+function renderGoalProgress() {
+  const goal = getGoal();
+  const container = document.getElementById('goalProgress');
+  const input = document.getElementById('goalInput');
+  if (goal) input.value = goal.targetAvg;
+  if (!goal) { container.innerHTML = ''; return; }
+  const rounds = JSON.parse(localStorage.getItem(k('rounds')) || '[]');
+  if (rounds.length === 0) {
+    container.innerHTML = '<p class="empty-note">Save a round to track progress toward your goal.</p>';
+    return;
+  }
+  const avgScore = rounds.reduce((a,r) => a + r.totalScore, 0) / rounds.length;
+  const diff = avgScore - goal.targetAvg;
+  const label = diff <= 0
+    ? `🎯 Averaging ${avgScore.toFixed(1)} — at or under your goal of ${goal.targetAvg}!`
+    : `Averaging ${avgScore.toFixed(1)} — ${diff.toFixed(1)} strokes above your goal of ${goal.targetAvg}.`;
+  container.innerHTML = `<div class="club-result" style="margin-bottom:16px;"><div class="club-name" style="font-size:1rem;">${label}</div></div>`;
+}
+
+document.getElementById('saveGoalBtn').addEventListener('click', () => {
+  const val = Number(document.getElementById('goalInput').value);
+  if (!val || val <= 0) {
+    alert('Enter a target scoring average first.');
+    return;
+  }
+  setGoalValue(val);
+  renderGoalProgress();
 });
 
 function estimateHandicap(rounds) {
@@ -1189,6 +1281,25 @@ function computeCourseBests(rounds) {
   return Object.values(map).sort((a,b) => a.diff - b.diff);
 }
 
+function computeGirFirStats(rounds) {
+  let girHit = 0, girTotal = 0, firHit = 0, firTotal = 0;
+  rounds.forEach(r => {
+    (r.holes || []).forEach(h => {
+      if (h.score === '' || h.score == null) return;
+      girTotal++;
+      if (h.gir) girHit++;
+      if (Number(h.par) !== 3) {
+        firTotal++;
+        if (h.fairway) firHit++;
+      }
+    });
+  });
+  return {
+    girPct: girTotal ? Math.round((girHit / girTotal) * 100) : null,
+    firPct: firTotal ? Math.round((firHit / firTotal) * 100) : null
+  };
+}
+
 function computeAchievements(rounds) {
   const badges = [];
   if (rounds.length >= 1) badges.push({ label: 'First round logged', icon: '🏁' });
@@ -1223,6 +1334,25 @@ function computeAchievements(rounds) {
   if (under80) badges.push({ label: 'Broke 80', icon: '🏆' });
 
   return badges;
+}
+
+function computeNemesisHoles(rounds) {
+  const map = {};
+  rounds.forEach(r => {
+    (r.holes || []).forEach(h => {
+      if (h.score === '' || h.score == null) return;
+      const key = r.course + '|' + h.hole;
+      if (!map[key]) map[key] = { course: r.course, hole: h.hole, sum: 0, count: 0 };
+      map[key].sum += Number(h.score) - Number(h.par);
+      map[key].count++;
+    });
+  });
+  return Object.values(map)
+    .filter(x => x.count >= 2)
+    .map(x => ({ ...x, avg: x.sum / x.count }))
+    .filter(x => x.avg >= 0.75)
+    .sort((a,b) => b.avg - a.avg)
+    .slice(0, 5);
 }
 
 function computeClubUsage(rounds) {
@@ -1285,6 +1415,22 @@ function renderStats() {
         <div class="stats-card">
           <span class="stats-num">${hcpLabel}</span>
           <span class="stats-lbl">Estimated handicap index (approx. — not official)</span>
+        </div>
+      </div>
+    `;
+  }
+
+  const girFir = computeGirFirStats(rounds);
+  if (girFir.girPct !== null || girFir.firPct !== null) {
+    html += `
+      <div class="stats-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 16px;">
+        <div class="stats-card">
+          <span class="stats-num">${girFir.girPct !== null ? girFir.girPct + '%' : '—'}</span>
+          <span class="stats-lbl">Greens in regulation</span>
+        </div>
+        <div class="stats-card">
+          <span class="stats-num">${girFir.firPct !== null ? girFir.firPct + '%' : '—'}</span>
+          <span class="stats-lbl">Fairways hit</span>
         </div>
       </div>
     `;
@@ -1361,7 +1507,38 @@ function renderStats() {
     html += `</div>`;
   }
 
+  const nemesisHoles = computeNemesisHoles(rounds);
   const clubUsage = computeClubUsage(rounds);
+  const nemesisClub = clubUsage.filter(c => c.avgDiff !== null && c.count >= 3).sort((a,b) => b.avgDiff - a.avgDiff)[0];
+
+  if (nemesisHoles.length > 0 || nemesisClub) {
+    html += `<h2 class="section-title" style="margin-top:6px; font-size:1.05rem;">Nemesis holes</h2>`;
+    html += `<p class="section-sub" style="margin-bottom:10px;">Patterns Loop noticed in your own rounds — worth a look before your next round there.</p>`;
+
+    if (nemesisClub) {
+      const avgLabel = nemesisClub.avgDiff > 0 ? '+' + nemesisClub.avgDiff.toFixed(1) : nemesisClub.avgDiff.toFixed(1);
+      html += `
+        <div class="round-card">
+          <div class="rc-course">🎯 Nemesis club: ${nemesisClub.club}</div>
+          <span class="rc-score over">avg ${avgLabel}</span>
+        </div>
+      `;
+    }
+
+    nemesisHoles.forEach(nh => {
+      const avgLabel = nh.avg > 0 ? '+' + nh.avg.toFixed(1) : nh.avg.toFixed(1);
+      html += `
+        <div class="round-card">
+          <div class="rc-course">Hole ${nh.hole} at ${escapeHtml(nh.course)}</div>
+          <span class="rc-score over">avg ${avgLabel} (${nh.count}x)</span>
+        </div>
+      `;
+    });
+    if (nemesisHoles.length > 0) {
+      html += `<p class="section-sub" style="margin-top:8px;">Check the Ask tab for strategy tips on tough holes before you tee off there again.</p>`;
+    }
+  }
+
   if (clubUsage.length > 0) {
     html += `<h2 class="section-title" style="margin-top:6px; font-size:1.05rem;">Club usage</h2>`;
     html += `<p class="section-sub" style="margin-bottom:10px;">How often each club was logged, and your average score-to-par on holes you used it.</p>`;
@@ -1379,11 +1556,81 @@ function renderStats() {
   panel.innerHTML = html;
 }
 
+function buildRoundSummaryText(r) {
+  const diff = r.totalScore - r.totalPar;
+  const diffLabel = diff === 0 ? 'E' : (diff > 0 ? '+' + diff : diff);
+  const holesPlayed = r.holesPlayed || (r.holes ? r.holes.length : 18);
+  let text = `⛳ ${r.course} — ${r.date}\n${holesPlayed} holes · Score: ${r.totalScore} (${diffLabel} to par)`;
+  if (r.notes) text += `\n"${r.notes}"`;
+  text += `\n\nTracked with Loop`;
+  return text;
+}
+
+async function shareRound(r) {
+  const text = buildRoundSummaryText(r);
+  if (navigator.share) {
+    try { await navigator.share({ text, title: 'My round on Loop' }); } catch (e) { /* user cancelled */ }
+  } else {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('Round summary copied to clipboard!');
+    } catch (e) {
+      alert(text);
+    }
+  }
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str || '';
   return div.innerHTML;
 }
+
+function renderCompareOptions() {
+  const rounds = JSON.parse(localStorage.getItem(k('rounds')) || '[]');
+  const selA = document.getElementById('compareRoundA');
+  const selB = document.getElementById('compareRoundB');
+  const optsHtml = '<option value="">— Select —</option>' + rounds.map((r, idx) => {
+    const diff = r.totalScore - r.totalPar;
+    const diffLabel = diff === 0 ? 'E' : (diff > 0 ? '+' + diff : diff);
+    return `<option value="${idx}">${escapeHtml(r.course)} — ${r.date} (${r.totalScore}, ${diffLabel})</option>`;
+  }).join('');
+  selA.innerHTML = optsHtml;
+  selB.innerHTML = optsHtml;
+}
+
+document.getElementById('compareRoundsBtn').addEventListener('click', () => {
+  const rounds = JSON.parse(localStorage.getItem(k('rounds')) || '[]');
+  const idxA = document.getElementById('compareRoundA').value;
+  const idxB = document.getElementById('compareRoundB').value;
+  const container = document.getElementById('compareResult');
+  if (idxA === '' || idxB === '') {
+    alert('Select two rounds to compare.');
+    return;
+  }
+  const a = rounds[Number(idxA)];
+  const b = rounds[Number(idxB)];
+  const maxHoles = Math.max((a.holes || []).length, (b.holes || []).length);
+  let html = '<table class="scorecard" style="margin-bottom:12px;"><thead><tr><th>Hole</th><th>Par</th><th>A</th><th>B</th><th>Diff</th></tr></thead><tbody>';
+  for (let i = 0; i < maxHoles; i++) {
+    const ha = (a.holes || [])[i];
+    const hb = (b.holes || [])[i];
+    if (!ha && !hb) continue;
+    const holeNum = ha ? ha.hole : (hb ? hb.hole : i+1);
+    const par = ha ? ha.par : (hb ? hb.par : '-');
+    const sa = ha && ha.score !== '' ? ha.score : '-';
+    const sb = hb && hb.score !== '' ? hb.score : '-';
+    let diffCell = '-';
+    if (sa !== '-' && sb !== '-') {
+      const d = Number(sa) - Number(sb);
+      diffCell = d === 0 ? 'E' : (d > 0 ? '+' + d : d);
+    }
+    html += `<tr><td class="hole-label">${holeNum}</td><td>${par}</td><td>${sa}</td><td>${sb}</td><td>${diffCell}</td></tr>`;
+  }
+  html += '</tbody></table>';
+  html += `<div class="totals-strip"><div class="stat"><span class="num">${a.totalScore}</span><span class="lbl">${escapeHtml(a.course)} (A)</span></div><div class="stat"><span class="num">${b.totalScore}</span><span class="lbl">${escapeHtml(b.course)} (B)</span></div></div>`;
+  container.innerHTML = html;
+});
 
 function renderPastRounds() {
   const rounds = JSON.parse(localStorage.getItem(k('rounds')) || '[]');
@@ -1409,10 +1656,17 @@ function renderPastRounds() {
       </div>
       <div style="display:flex; align-items:center;">
         <span class="rc-score ${diffClass}">${r.totalScore} (${diffLabel})</span>
+        <button class="share-round" data-idx="${idx}" title="Share this round">share</button>
         <button class="del" data-idx="${idx}">remove</button>
       </div>
     `;
     container.appendChild(div);
+  });
+  container.querySelectorAll('.share-round').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const idx = Number(e.target.dataset.idx);
+      shareRound(rounds[idx]);
+    });
   });
   container.querySelectorAll('.del').forEach(btn => {
     btn.addEventListener('click', e => {
@@ -1422,9 +1676,53 @@ function renderPastRounds() {
       localStorage.setItem(k('rounds'), JSON.stringify(rounds));
       renderPastRounds();
       renderStats();
+      renderGoalProgress();
+      renderCompareOptions();
     });
   });
 }
+
+document.getElementById('backupBtn').addEventListener('click', () => {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('loop_')) {
+      data[key] = localStorage.getItem(key);
+    }
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'loop-backup-' + new Date().toISOString().split('T')[0] + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('restoreInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!confirm('This will overwrite your current Loop data with the backup file. Continue?')) {
+    e.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      Object.keys(data).forEach(key => {
+        if (key.startsWith('loop_')) localStorage.setItem(key, data[key]);
+      });
+      alert('Backup restored! Reloading Loop now.');
+      location.reload();
+    } catch (err) {
+      alert('Could not read that file — make sure it\'s a Loop backup .json file.');
+    }
+  };
+  reader.readAsText(file);
+});
 
 document.getElementById('exportCsvBtn').addEventListener('click', () => {
   const rounds = JSON.parse(localStorage.getItem(k('rounds')) || '[]');
@@ -1598,6 +1896,75 @@ document.getElementById('weatherBtn').addEventListener('click', () => {
     alert('Location permission is needed to check local conditions.');
     btn.textContent = original;
   });
+});
+
+// ---------- Caddy: pre-round checklist (global, not profile-scoped — it's gear, not stats) ----------
+const defaultChecklist = [
+  { id: 'c1', label: 'Tees', checked: false },
+  { id: 'c2', label: 'Golf balls', checked: false },
+  { id: 'c3', label: 'Glove', checked: false },
+  { id: 'c4', label: 'Rangefinder / GPS', checked: false },
+  { id: 'c5', label: 'Water', checked: false },
+  { id: 'c6', label: 'Snacks', checked: false },
+  { id: 'c7', label: 'Sunscreen', checked: false },
+  { id: 'c8', label: 'Rain gear', checked: false }
+];
+
+function getChecklist() {
+  const saved = localStorage.getItem('loop_checklist');
+  return saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(defaultChecklist));
+}
+function setChecklist(list) { localStorage.setItem('loop_checklist', JSON.stringify(list)); }
+
+function renderChecklist() {
+  const list = getChecklist();
+  const container = document.getElementById('checklistItems');
+  container.innerHTML = '';
+  list.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'checklist-row' + (item.checked ? ' checked' : '');
+    row.innerHTML = `
+      <input type="checkbox" data-id="${item.id}" ${item.checked ? 'checked' : ''}>
+      <label>${escapeHtml(item.label)}</label>
+      <button class="del-item" data-id="${item.id}">✕</button>
+    `;
+    container.appendChild(row);
+  });
+  container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', e => {
+      const list = getChecklist();
+      const item = list.find(i => i.id === e.target.dataset.id);
+      if (item) item.checked = e.target.checked;
+      setChecklist(list);
+      renderChecklist();
+    });
+  });
+  container.querySelectorAll('.del-item').forEach(btn => {
+    btn.addEventListener('click', e => {
+      let list = getChecklist();
+      list = list.filter(i => i.id !== e.target.dataset.id);
+      setChecklist(list);
+      renderChecklist();
+    });
+  });
+}
+
+document.getElementById('addChecklistItemBtn').addEventListener('click', () => {
+  const input = document.getElementById('checklistNewItem');
+  const label = input.value.trim();
+  if (!label) return;
+  const list = getChecklist();
+  list.push({ id: 'c_' + Date.now(), label, checked: false });
+  setChecklist(list);
+  input.value = '';
+  renderChecklist();
+});
+
+document.getElementById('resetChecklistBtn').addEventListener('click', () => {
+  const list = getChecklist();
+  list.forEach(i => i.checked = false);
+  setChecklist(list);
+  renderChecklist();
 });
 
 // ---------- Caddy: practice log (profile-scoped) ----------
@@ -1977,6 +2344,9 @@ renderHolePlan();
 renderPastRounds();
 renderStats();
 renderPracticeList();
+renderChecklist();
+renderGoalProgress();
+renderCompareOptions();
 </script>
 </body>
 </html>
